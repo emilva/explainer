@@ -20,21 +20,25 @@ This enables **Symbolic Recursion**: the ability to embed a recursive call to an
 
 In this scenario, the agent is manually "driving" the iteration. It has to stay awake and focused enough to output a tool call for every single file.
 
-```text
-[Context Window]
-User: "Check 1M files for a weird property."
+```mermaid
+sequenceDiagram
+    participant User
+    participant Model
+    participant Tool
 
-[Model Generation Cycle]
-Model: Use Tool -> scan_file("file_1")
-   <-- Tool Output: "Nothing found"
-Model: Use Tool -> scan_file("file_2")
-   <-- Tool Output: "Nothing found"
-Model: Use Tool -> scan_file("file_3")
-   <-- Tool Output: "Nothing found"
-...
-... (repeats 999,997 more times) ...
-...
-Model: *Hallucinates or hits token limit* "I'm done."
+    User->>Model: "Check 1M files for a weird property."
+    
+    rect rgb(50, 20, 20)
+    note right of Model: Model Generation Cycle (Repeats 1M times)
+    Model->>Tool: scan_file("file_1")
+    Tool-->>Model: "Nothing found"
+    Model->>Tool: scan_file("file_2")
+    Tool-->>Model: "Nothing found"
+    Model->>Tool: ...
+    end
+
+    Note over Model: Context Window Fills Up & Rot Occurs
+    Model--xUser: *Hallucinates or Fails*
 ```
 
 **The Problem:** The LLM acts as the for-loop. If the context window fills up, or the model loses "focus," the loop breaks. "Context Folding" here is usually just summarizing history, which is lossy and prone to error at scale.
@@ -44,35 +48,27 @@ Model: *Hallucinates or hits token limit* "I'm done."
 
 The agent acts as the *programmer*, offloading repetitive logic to a runtime environment that is guaranteed to be correct (e.g., Python).
 
-```text
-[Context Window]
-User: "Check 1M files for a weird property."
+```mermaid
+sequenceDiagram
+    participant User
+    participant Model
+    participant REPL
+    participant SubAgent
 
-[Model Generation Cycle]
-Model: *Writes Code*
-       ```python
-       results = []
-       files = list_all_files()
-       
-       # The LOOP is here, in code, not in the model's head
-       for f in files: 
-           # SYMBOLIC RECURSION: The code calls the sub-agent
-           if sub_agent_check(f, "weird property"):
-               results.append(f)
-       
-       print(results)
-       ```
+    User->>Model: "Check 1M files for a weird property."
+    Model->>REPL: Writes & Executes Python Loop
+    
+    rect rgb(20, 50, 20)
+    note right of REPL: REPL Execution Cycle (Hidden from Model)
+    loop For each file
+        REPL->>SubAgent: sub_agent_check(file_i)
+        SubAgent-->>REPL: boolean result
+    end
+    end
 
-[REPL Execution Cycle]
-REPL: Runs the loop. 
-      - Spawns isolated sub-agent for file_1
-      - Spawns isolated sub-agent for file_2
-      ...
-      - Spawns isolated sub-agent for file_1,000,000
-      (This happens outside the main model's context)
-
-[Final Context State]
-Model: "Here is the list of files matching your criteria: [list]"
+    REPL-->>Model: Returns filtered list [file_x, file_y...]
+    Note over Model: Context is Clean
+    Model->>User: "Here is the list..."
 ```
 
 **The Solution:** The main model's context **never grows** regardless of the number of files. It wrote 5 lines of code, and the REPL performed 1 million operations. The context was effectively "folded" into the execution state of the variable `results`.
