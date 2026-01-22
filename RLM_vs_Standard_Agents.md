@@ -1,6 +1,6 @@
 # RLM vs. Standard Agents (Claude Code, Codex, etc.)
 
-This document outlines the fundamental differences between **Recursive Language Models (RLMs)** and standard agentic workflows (like Claude Code, context folding, etc.), based on research by Alex Zhang.
+This document outlines the fundamental differences between **Recursive Language Models (RLMs)** and standard agentic workflows (like Claude Code, context folding, etc.), based on research by Alex Zhang and his tweet https://x.com/a1zhang/status/2014337263287804260
 
 ## The Core Distinction: Symbolic Recursion
 
